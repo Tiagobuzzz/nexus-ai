@@ -1,6 +1,9 @@
 # Nexus Cross AI
 
 This is a minimal prototype for the Nexus Cross AI project using Next.js, Firebase and the OpenAI API.
+It now includes a very small usage counter and a dropdown to choose between AI models.
+Only the OpenAI option is fully functional – the others return placeholder text.
+Each authenticated user can see their request history stored in Firestore.
 
 ## Development
 
