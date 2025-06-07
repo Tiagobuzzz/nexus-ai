@@ -12,10 +12,11 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [response, setResponse] = useState('')
   const [model, setModel] = useState('openai')
+  const [tier, setTier] = useState('freemium')
   const [history, setHistory] = useState<any[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [usage, setUsage] = useState(0)
-  const usageLimit = 5
+  const usageLimit = tier === 'freemium' ? 5 : Infinity
 
   useEffect(() => {
     const signInAndLoad = async () => {
@@ -44,7 +45,7 @@ export default function Home() {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, model })
+      body: JSON.stringify({ prompt, model, tier })
     })
     const data = await res.json()
     setResponse(data.result)
@@ -53,10 +54,15 @@ export default function Home() {
       await addDoc(collection(db, 'history'), {
         uid: user.uid,
         prompt,
+        model,
+        tier,
         result: data.result,
         ts: Date.now(),
       })
-      setHistory([{ prompt, result: data.result, ts: Date.now() }, ...history])
+      setHistory([
+        { prompt, result: data.result, model, tier, ts: Date.now() },
+        ...history,
+      ])
       setUsage(usage + 1)
     }
   }
@@ -67,12 +73,27 @@ export default function Home() {
       <div className="flex flex-col w-full max-w-xl space-y-2">
         <select
           className="border p-2"
+          value={tier}
+          onChange={(e) => {
+            setTier(e.target.value)
+            setUsage(0)
+          }}
+        >
+          <option value="freemium">Freemium</option>
+          <option value="premium">Premium</option>
+        </select>
+        <select
+          className="border p-2"
           value={model}
           onChange={(e) => setModel(e.target.value)}
         >
           <option value="openai">OpenAI GPT-4o</option>
-          <option value="claude">Claude (soon)</option>
-          <option value="gemini">Gemini (soon)</option>
+          <option value="claude" disabled={tier === 'freemium'}>
+            Claude (soon)
+          </option>
+          <option value="gemini" disabled={tier === 'freemium'}>
+            Gemini (soon)
+          </option>
         </select>
         <textarea
           className="w-full p-2 border"
@@ -86,8 +107,10 @@ export default function Home() {
         >
           Run Analysis
         </button>
-        <p className="text-sm text-gray-600">Usage: {usage}/{usageLimit}</p>
-        {usage >= usageLimit && (
+        <p className="text-sm text-gray-600">
+          Usage: {usage}/{usageLimit === Infinity ? '∞' : usageLimit}
+        </p>
+        {usage >= usageLimit && usageLimit !== Infinity && (
           <p className="text-red-500">Free limit reached. <a href="#" className="underline">Upgrade to premium</a></p>
         )}
       </div>
@@ -105,6 +128,9 @@ export default function Home() {
             {history.map((h, i) => (
               <li key={i} className="border p-2 mb-2">
                 <p className="font-semibold">{h.prompt}</p>
+                <p className="text-sm text-gray-500 mb-1">
+                  Model: {h.model} – Tier: {h.tier}
+                </p>
                 <p>{h.result}</p>
               </li>
             ))}
