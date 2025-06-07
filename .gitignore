@@ -1,0 +1,9 @@
+node_modules
+.next
+.env.local
+
+# Logs
+npm-debug.log*
+
+# Mac files
+.DS_Store
