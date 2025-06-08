@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { signInAnonymously, User } from 'firebase/auth'
 import { collection, addDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { initFirebase } from '../firebaseConfig'
@@ -8,15 +8,17 @@ import { initFirebase } from '../firebaseConfig'
 const { auth, db } = initFirebase()
 
 export default function Home() {
+  const [started, setStarted] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [loading, setLoading] = useState(false)
-  const [response, setResponse] = useState('')
-  const [model, setModel] = useState('openai')
+  const [response, setResponse] = useState<any>(null)
+  const [mode, setMode] = useState('gold')
   const [tier, setTier] = useState('freemium')
   const [history, setHistory] = useState<any[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [usage, setUsage] = useState(0)
   const usageLimit = tier === 'freemium' ? 5 : Infinity
+  const resultRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const signInAndLoad = async () => {
@@ -45,26 +47,50 @@ export default function Home() {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, model, tier })
+      body: JSON.stringify({ prompt, mode, tier })
     })
     const data = await res.json()
-    setResponse(data.result)
+    setResponse(data)
     setLoading(false)
+    if (resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
     if (user) {
       await addDoc(collection(db, 'history'), {
         uid: user.uid,
         prompt,
-        model,
+        mode,
         tier,
-        result: data.result,
+        result: data,
         ts: Date.now(),
       })
       setHistory([
-        { prompt, result: data.result, model, tier, ts: Date.now() },
+        { prompt, result: data, mode, tier, ts: Date.now() },
         ...history,
       ])
       setUsage(usage + 1)
     }
+  }
+
+  if (!started) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center text-center space-y-4 animate-fade-in">
+        <h1 className="text-4xl font-bold">Talk to AI. Smarter. Together.</h1>
+        <p className="text-lg">Get combined insights from top AI models.</p>
+        <p className="text-sm text-gray-500">Powered by Multiple AI Models</p>
+        <button onClick={() => setStarted(true)} className="bg-blue-600 text-white px-6 py-2 rounded">
+          Start Chat
+        </button>
+      </main>
+    )
+  }
+
+  const colorMap: Record<string, string> = {
+    gold: 'border-yellow-400',
+    silver: 'border-gray-300',
+    bronze: 'border-amber-700',
+    duo: 'border-blue-400',
+    trio: 'border-purple-500',
   }
 
   return (
@@ -84,16 +110,14 @@ export default function Home() {
         </select>
         <select
           className="border p-2"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
+          value={mode}
+          onChange={(e) => setMode(e.target.value)}
         >
-          <option value="openai">OpenAI GPT-4o</option>
-          <option value="claude" disabled={tier === 'freemium'}>
-            Claude (soon)
-          </option>
-          <option value="gemini" disabled={tier === 'freemium'}>
-            Gemini (soon)
-          </option>
+          <option value="gold">Gold (GPT-4o)</option>
+          <option value="silver" disabled={tier === 'freemium'}>Silver (Claude)</option>
+          <option value="bronze" disabled={tier === 'freemium'}>Bronze (Gemini)</option>
+          <option value="duo" disabled={tier === 'freemium'}>Duo (GPT + Claude)</option>
+          <option value="trio" disabled={tier === 'freemium'}>Trio (All Models)</option>
         </select>
         <textarea
           className="w-full p-2 border"
@@ -105,7 +129,7 @@ export default function Home() {
           className="bg-blue-600 text-white px-4 py-2 rounded"
           disabled={loading}
         >
-          Run Analysis
+          Ask Now
         </button>
         <p className="text-sm text-gray-600">
           Usage: {usage}/{usageLimit === Infinity ? '∞' : usageLimit}
@@ -114,11 +138,40 @@ export default function Home() {
           <p className="text-red-500">Free limit reached. <a href="#" className="underline">Upgrade to premium</a></p>
         )}
       </div>
-      {loading && <p>Loading...</p>}
+      {loading && (
+        <p className="loading-dots mt-4">Cross-AI discussion in progress<span>.</span><span>.</span><span>.</span></p>
+      )}
       {response && (
-        <div className="border-2 border-yellow-400 p-4 mt-4 w-full max-w-xl">
-          <p className="font-bold mb-2">Result:</p>
-          <p>{response}</p>
+        <div ref={resultRef} className={`border-2 p-4 mt-4 w-full max-w-xl space-y-4 ${colorMap[mode]}`}> 
+          {response.parts && (
+            <div className="space-y-2">
+              {response.parts.gold && (
+                <div className="border p-2">
+                  <p className="text-sm font-semibold">Gold Response</p>
+                  <p>{response.parts.gold}</p>
+                </div>
+              )}
+              {response.parts.silver && (
+                <div className="border p-2">
+                  <p className="text-sm font-semibold">Silver Response</p>
+                  <p>{response.parts.silver}</p>
+                </div>
+              )}
+              {response.parts.bronze && (
+                <div className="border p-2">
+                  <p className="text-sm font-semibold">Bronze Response</p>
+                  <p>{response.parts.bronze}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <div>
+            <p className="font-bold mb-2">{response.parts ? 'Synthesized Result:' : 'Result:'}</p>
+            <p>{response.parts ? response.final : response.result}</p>
+            {response.parts && (
+              <p className="text-xs text-gray-500 mt-1">Synthesized from multiple AI minds</p>
+            )}
+          </div>
         </div>
       )}
       {history.length > 0 && (
@@ -128,10 +181,8 @@ export default function Home() {
             {history.map((h, i) => (
               <li key={i} className="border p-2 mb-2">
                 <p className="font-semibold">{h.prompt}</p>
-                <p className="text-sm text-gray-500 mb-1">
-                  Model: {h.model} – Tier: {h.tier}
-                </p>
-                <p>{h.result}</p>
+                <p className="text-sm text-gray-500 mb-1">Mode: {h.mode} – Tier: {h.tier}</p>
+                <p>{h.result.parts ? h.result.final : h.result.result}</p>
               </li>
             ))}
           </ul>

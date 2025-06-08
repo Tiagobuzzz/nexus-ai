@@ -1,9 +1,9 @@
 # Nexus Cross AI
 
 This is a minimal prototype for the Nexus Cross AI project using Next.js, Firebase and multiple LLM APIs.
-The app features a freemium/premium toggle with usage limits and a dropdown to choose between AI models.
+The app features a freemium/premium toggle with usage limits and a dropdown to choose between AI modes.
 OpenAI, Claude and Gemini integrations are supported when the respective API keys are configured.
-Each authenticated user can see their request history stored in Firestore including the selected model and tier.
+Each authenticated user can see their request history stored in Firestore including the chosen mode and tier.
 
 ## Development
 
@@ -15,8 +15,10 @@ Each authenticated user can see their request history stored in Firestore includ
 npm run dev
 ```
 
-The app provides a simple textarea to submit a prompt. It calls a serverless
-function that forwards the prompt to GPT‑4 and shows a **Gold** styled result.
+The app now starts with a minimal landing screen. After clicking **Start Chat**
+users can submit prompts and select single, duo or trio AI modes. Requests are
+sent to the backend which orchestrates the chosen models and returns the
+result or a synthesized answer.
 Anonymous authentication is used and each interaction is stored in Firestore.
 
 Due to environment limitations this repository does not include `node_modules`.
