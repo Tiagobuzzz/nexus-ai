@@ -8,36 +8,32 @@ const geminiApi =
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
 export async function POST(req: NextRequest) {
-  const { prompt, model, tier } = await req.json()
+  const { prompt, mode, tier } = await req.json()
   if (!prompt) {
     return NextResponse.json({ error: 'No prompt provided' }, { status: 400 })
   }
 
-  const selected = model || 'openai'
+  const selected = mode || 'gold'
 
-  if (tier === 'freemium' && selected !== 'openai') {
+  if (tier === 'freemium' && selected !== 'gold') {
     return NextResponse.json(
-      { error: 'Freemium users can only access the OpenAI model' },
+      { error: 'Freemium users can only access the Gold model' },
       { status: 403 }
     )
   }
 
-  if (selected === 'openai') {
+  const callOpenAI = async (p: string) => {
     const chat = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: p }],
       model: 'gpt-4o',
     })
-    const result = chat.choices[0].message.content
-    return NextResponse.json({ result })
+    return chat.choices[0].message.content as string
   }
 
-  if (selected === 'claude') {
+  const callClaude = async (p: string) => {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Anthropic API key missing' },
-        { status: 500 }
-      )
+      throw new Error('Anthropic API key missing')
     }
     const res = await fetch(anthropicApi, {
       method: 'POST',
@@ -52,23 +48,19 @@ export async function POST(req: NextRequest) {
         messages: [
           {
             role: 'user',
-            content: prompt,
+            content: p,
           },
         ],
       }),
     })
     const data = await res.json()
-    const result = data?.content?.[0]?.text || 'No response from Claude.'
-    return NextResponse.json({ result })
+    return data?.content?.[0]?.text || 'No response from Claude.'
   }
 
-  if (selected === 'gemini') {
+  const callGemini = async (p: string) => {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Gemini API key missing' },
-        { status: 500 }
-      )
+      throw new Error('Gemini API key missing')
     }
     const res = await fetch(`${geminiApi}?key=${apiKey}`, {
       method: 'POST',
@@ -76,16 +68,55 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         contents: [
           {
-            parts: [{ text: prompt }],
+            parts: [{ text: p }],
             role: 'user',
           },
         ],
       }),
     })
     const data = await res.json()
-    const result =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No response from Gemini.'
+    return (
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      'No response from Gemini.'
+    )
+  }
+
+  if (selected === 'gold') {
+    const result = await callOpenAI(prompt)
     return NextResponse.json({ result })
+  }
+
+  if (selected === 'silver') {
+    const result = await callClaude(prompt)
+    return NextResponse.json({ result })
+  }
+
+  if (selected === 'bronze') {
+    const result = await callGemini(prompt)
+    return NextResponse.json({ result })
+  }
+
+  if (selected === 'duo') {
+    const [gold, silver] = await Promise.all([
+      callOpenAI(prompt),
+      callClaude(prompt),
+    ])
+    const final = await callOpenAI(
+      `Combine these answers into one helpful response.\nGPT: ${gold}\nClaude: ${silver}`
+    )
+    return NextResponse.json({ parts: { gold, silver }, final })
+  }
+
+  if (selected === 'trio') {
+    const [gold, silver, bronze] = await Promise.all([
+      callOpenAI(prompt),
+      callClaude(prompt),
+      callGemini(prompt),
+    ])
+    const final = await callOpenAI(
+      `Combine these answers into one helpful response.\nGPT: ${gold}\nClaude: ${silver}\nGemini: ${bronze}`
+    )
+    return NextResponse.json({ parts: { gold, silver, bronze }, final })
   }
 
   return NextResponse.json({ error: 'Unknown model' }, { status: 400 })
