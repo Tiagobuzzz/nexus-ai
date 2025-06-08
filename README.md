@@ -1,5 +1,7 @@
 # Nexus Cross AI
 
+![License: Proprietary](https://img.shields.io/badge/License-Proprietary-blue.svg)
+
 This is a minimal prototype for the Nexus Cross AI project using Next.js, Firebase and multiple LLM APIs.
 The app features a freemium/premium toggle with usage limits and a dropdown to choose between AI modes.
 OpenAI, Claude and Gemini integrations are supported when the respective API keys are configured.
@@ -22,3 +24,7 @@ result or a synthesized answer.
 Anonymous authentication is used and each interaction is stored in Firestore.
 
 Due to environment limitations this repository does not include `node_modules`.
+
+## License
+
+This project is released under a proprietary license. See [LICENSE](LICENSE) for details.
