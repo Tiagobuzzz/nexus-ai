@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Toast from './Toast'
 import { signInAnonymously, User } from 'firebase/auth'
 import { collection, addDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { initFirebase } from '../firebaseConfig'
@@ -17,6 +18,7 @@ export default function Home() {
   const [history, setHistory] = useState<any[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [usage, setUsage] = useState(0)
+  const [toast, setToast] = useState('')
   const usageLimit = tier === 'freemium' ? 5 : Infinity
   const resultRef = useRef<HTMLDivElement | null>(null)
 
@@ -40,7 +42,7 @@ export default function Home() {
 
   const runAnalysis = async () => {
     if (usage >= usageLimit) {
-      alert('Free usage limit reached. Please upgrade to continue.')
+      setToast('Free usage limit reached. Please upgrade to continue.')
       return
     }
     setLoading(true)
@@ -52,6 +54,7 @@ export default function Home() {
     const data = await res.json()
     setResponse(data)
     setLoading(false)
+    setToast('Analysis complete!')
     if (resultRef.current) {
       resultRef.current.scrollIntoView({ behavior: 'smooth' })
     }
@@ -120,7 +123,7 @@ export default function Home() {
           <option value="trio" disabled={tier === 'freemium'}>Trio (All Models)</option>
         </select>
         <textarea
-          className="w-full p-2 border"
+          className="w-full p-2 border rounded resize-none min-h-[120px]"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
         />
@@ -139,7 +142,7 @@ export default function Home() {
         )}
       </div>
       {loading && (
-        <p className="loading-dots mt-4">Cross-AI discussion in progress<span>.</span><span>.</span><span>.</span></p>
+        <p className="loading-dots mt-4 text-center">Processing<span>.</span><span>.</span><span>.</span></p>
       )}
       {response && (
         <div ref={resultRef} className={`border-2 p-4 mt-4 w-full max-w-xl space-y-4 ${colorMap[mode]}`}> 
@@ -188,6 +191,7 @@ export default function Home() {
           </ul>
         </div>
       )}
+      <Toast message={toast} onClose={() => setToast('')} />
     </main>
   )
 }
